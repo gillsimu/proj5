@@ -7,7 +7,6 @@ import (
 	"sync"
 )
 
-// TODO Add fields you need here
 type RaftSurfstore struct {
 	isLeader      bool
 	isLeaderMutex *sync.RWMutex
@@ -29,22 +28,81 @@ type RaftSurfstore struct {
 	UnimplementedRaftSurfstoreServer
 }
 
+func (s *RaftSurfstore) CheckPreConditions() error {
+	// check if server is leader or not
+	s.isLeaderMutex.RLock()
+	defer s.isLeaderMutex.RUnlock()
+	isServerLeader := s.isLeader
+	
+	if !isServerLeader {
+		return ERR_NOT_LEADER
+	}
+
+	// check if server is crashed
+	s.isCrashedMutex.RLock()
+	defer s.isCrashedMutex.RUnlock()
+	isCrashed := s.isCrashed
+	
+	if isCrashed {
+		return ERR_SERVER_CRASHED
+	}
+
+	return nil
+}
+
+
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
-	panic("todo")
-	return nil, nil
+	if err := s.CheckPreConditions(); err != nil {
+		return nil, err
+	}
+
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
+	for {
+		if success, _ := s.SendHeartbeat(ctx, empty); success.Flag {
+			return s.metaStore.GetFileInfoMap(ctx, empty)
+		}
+	}
+	
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
-	panic("todo")
-	return nil, nil
+	if err := s.CheckPreConditions(); err != nil {
+		return nil, err
+	}
+
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
+	for {
+		if success, _ := s.SendHeartbeat(ctx, new(emptypb.Empty)); success.Flag {
+			return s.metaStore.GetBlockStoreMap(ctx, hashes)
+		}
+	}
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
-	panic("todo")
-	return nil, nil
+	if err := s.CheckPreConditions(); err != nil {
+		return nil, err
+	}
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
+	for {
+		if success, _ := s.SendHeartbeat(ctx, empty); success.Flag {
+			return s.metaStore.GetBlockStoreAddrs(ctx, empty)
+		}
+	}
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
+	if err := s.CheckPreConditions(); err != nil {
+		return nil, err
+	}
 
 	// append entry to our log
 	s.log = append(s.log, &UpdateOperation{
@@ -166,29 +224,53 @@ func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Succe
 	return nil, nil
 }
 
+func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {
+	if commitIndex == -1 {
+		return 0
+	}
+	return s.log[s.commitIndex].Term
+}
+
 func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
+	if err := s.CheckPreConditions(); err != nil {
+		return &Success{Flag: false}, err
+	}
 
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term: s.term,
-		// TODO put the right values
-		PrevLogTerm:  -1,
-		PrevLogIndex: -1,
+		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
+		PrevLogIndex: s.commitIndex,
 		Entries:      s.log,
 		LeaderCommit: s.commitIndex,
 	}
+
+	noOfNodesDead := len(s.peers)
+	countOfMajorityNodes := len(s.peers)/2
+
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
 			continue
 		}
 
-		// TODO check all errors
-		conn, _ := grpc.Dial(addr, grpc.WithInsecure())
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return &Success{Flag: false}, nil
+		}
 		client := NewRaftSurfstoreClient(conn)
 
-		_, _ = client.AppendEntries(ctx, &dummyAppendEntriesInput)
+		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
+		if appendEntryOutput != nil {
+			noOfNodesDead--;
+		}
 	}
-	return nil, nil
+	
+	noOfNodesAlive := len(s.peers) - noOfNodesDead
+	if noOfNodesAlive > countOfMajorityNodes {
+		return &Success{Flag: true}, nil
+	}
+
+	return &Success{Flag: false}, nil
 }
 
 // ========== DO NOT MODIFY BELOW THIS LINE =====================================
