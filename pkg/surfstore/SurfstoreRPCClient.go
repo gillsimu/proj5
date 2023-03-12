@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"fmt"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -86,48 +87,63 @@ func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr st
 	return conn.Close()
 }
 
+func KnownError(err error) bool {
+	if err == ERR_SERVER_CRASHED ||  err == ERR_NOT_LEADER {
+		return true;
+	}
+	return false
+}
+
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
-	// connect to the server
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
+		// connect to the server
+		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	b, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	*serverFileInfoMap = b.FileInfoMap
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		b, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
+		if err != nil && !KnownError(err) {
+			conn.Close()
+			return err
+		}
+		*serverFileInfoMap = b.FileInfoMap
 
-	// close the connection
-	return conn.Close()
+		// close the connection
+		return conn.Close()
+	}
+	return UNKOWN_ERROR
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
-	// connect to the server
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+		// connect to the server
+		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
+		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	b, err := c.UpdateFile(ctx, fileMetaData)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	*latestVersion = b.Version
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		b, err := c.UpdateFile(ctx, fileMetaData)
+		if err != nil && !KnownError(err) {
+			conn.Close()
+			return err
+		}
+		*latestVersion = b.Version
 
-	// close the connection
-	return conn.Close()
+		// close the connection
+		return conn.Close()
+	}
+	return UNKOWN_ERROR
 }
 
 
@@ -155,58 +171,66 @@ func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *
 }
 
 func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStoreMap *map[string][]string) error {
-	// connect to the server
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	tempBlockHash := BlockHashes{
-		Hashes: blockHashesIn,
-	}
-	b, err := c.GetBlockStoreMap(ctx, &tempBlockHash)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	
-	m := make(map[string][]string)
-
-	for key, val := range b.BlockStoreMap {
-		hashes := []string{}
-		for _, v := range val.Hashes {
-			hashes = append(hashes, v)
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+		// connect to the server
+		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
+		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
+		if err != nil {
+			return err
 		}
-		m[key] = hashes
-	}
-	*blockStoreMap = m
+		c := NewRaftSurfstoreClient(conn)
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		tempBlockHash := BlockHashes{
+			Hashes: blockHashesIn,
+		}
+		b, err := c.GetBlockStoreMap(ctx, &tempBlockHash)
+		if err != nil && !KnownError(err) {
+			conn.Close()
+			return err
+		}
+		
+		m := make(map[string][]string)
 
-	// close the connection
-	return conn.Close()
+		for key, val := range b.BlockStoreMap {
+			hashes := []string{}
+			for _, v := range val.Hashes {
+				hashes = append(hashes, v)
+			}
+			m[key] = hashes
+		}
+		*blockStoreMap = m
+
+		// close the connection
+		return conn.Close()
+	}
+	return UNKOWN_ERROR
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
-	// connect to the server
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	b, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	*blockStoreAddrs = b.BlockStoreAddrs
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+		// connect to the server
+		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
+		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		b, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
+		if err != nil && !KnownError(err) {
+			conn.Close()
+			return err
+		}
+		*blockStoreAddrs = b.BlockStoreAddrs
 
-	// close the connection
-	return conn.Close()
+		// close the connection
+		return conn.Close()
+	}
+	return UNKOWN_ERROR
 }
 
 
