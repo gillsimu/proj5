@@ -35,8 +35,6 @@ func LoadRaftConfigFile(filename string) (cfg RaftConfig) {
 }
 
 func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
-	// TODO Any initialization you need here
-
 	isLeaderMutex := sync.RWMutex{}
 	isCrashedMutex := sync.RWMutex{}
 
@@ -48,7 +46,6 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 		log:            make([]*UpdateOperation, 0),
 		isCrashed:      false,
 		isCrashedMutex: &isCrashedMutex,
-		// Added for discussion TODO : fix or add more fields if needed
 		id:             id,
 		peers:          config.RaftAddrs,
 		pendingCommits: make([]*chan bool, 0),
@@ -59,7 +56,6 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 	return &server, nil
 }
 
-// TODO Start up the Raft server and any services here
 func ServeRaftServer(server *RaftSurfstore) error {
 	grpcServer := grpc.NewServer()
 	RegisterRaftSurfstoreServer(grpcServer, server)
