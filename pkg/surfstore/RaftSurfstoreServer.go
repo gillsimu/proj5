@@ -127,14 +127,14 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 
-	return nil, UNKOWN_ERROR
+	return nil, nil
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// send entry to all my followers and count the replies
-	responses := make(chan bool, len(s.peers)-1)
 
-	// contact all the follower, send some AppendEntries cal
+	responses := make(chan bool, len(s.peers)-1)
+	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
 			continue
@@ -165,7 +165,6 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 }
 
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, responses chan bool) {
-	
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term: s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
@@ -177,10 +176,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 	for {
 		// TODO check all errors
 		
-		if err := s.CheckPreConditions(false, true); err != nil {
-			responses <- false
-			return 
-		}
+
 		conn, _ := grpc.Dial(addr, grpc.WithInsecure())
 		client := NewRaftSurfstoreClient(conn)
 		
@@ -195,27 +191,17 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 	responses <- true
 }
 
-// 1. Reply false if term < currentTerm (§5.1)
-// 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term
-// matches prevLogTerm (§5.3)
+// 1. Reply false if term < currentTerm (Â§5.1)
+// 2. Reply false if log doesnâ€™t contain an entry at prevLogIndex whose term
+// matches prevLogTerm (Â§5.3)
 // 3. If an existing entry conflicts with a new one (same index but different
-// terms), delete the existing entry and all that follow it (§5.3)
+// terms), delete the existing entry and all that follow it (Â§5.3)
 // 4. Append any new entries not already in the log
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	if err := s.CheckPreConditions(false, true); err != nil {
-		return &AppendEntryOutput{
-			Success:      false,
-			MatchedIndex: -1,
-		}, ERR_SERVER_CRASHED
-	}
-
-	if input.Term < s.term { 
-		return &AppendEntryOutput{
-			Success:      false,
-			MatchedIndex: -1,
-		}, ERR_SERVER_CRASHED
+		return nil, ERR_SERVER_CRASHED
 	}
 
 	if input.Term > s.term {
@@ -226,37 +212,12 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	lastIndexMatchesLogs := int64(len(s.log) -1)
-	for id, log := range s.log{
-		if id >= len(input.Entries){
-			break
-		}
+	s.log = input.Entries
 
-		if log == input.Entries[id] {
-			s.lastApplied = int64(id)
-			lastIndexMatchesLogs = int64(id)
-		} else {
-			break
-		}
-	}
-
-	s.log = s.log[:lastIndexMatchesLogs + 1]
-	if lastIndexMatchesLogs < int64(len(input.Entries)) { 
-		s.log = append(s.log, input.Entries[lastIndexMatchesLogs + 1:]...)
-	} else {
-		s.log = append(s.log, make([]*UpdateOperation, 0)...)
-	}
-
-	if s.commitIndex < input.LeaderCommit  {
-		s.commitIndex = int64(len(s.log)-1)
-		if s.commitIndex > int64(input.LeaderCommit) {
-			s.commitIndex = int64(input.LeaderCommit)
-		}
-		for s.lastApplied < s.commitIndex {
-			entry := s.log[s.lastApplied+1]
-			s.metaStore.UpdateFile(ctx, entry.FileMetaData)
-			s.lastApplied++
-		}
+	for s.lastApplied < input.LeaderCommit {
+		entry := s.log[s.lastApplied+1]
+		s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+		s.lastApplied++
 	}
 
 	return &AppendEntryOutput{
@@ -266,17 +227,13 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
-	
-	if err := s.CheckPreConditions(false, true); err != nil {
-		return &Success{Flag: false}, err
-	}
-	
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
 	s.term++
 
-	return &Success{Flag: true}, nil
+	// TODO update state as per paper
+	return nil, nil
 }
 
 func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {
@@ -310,7 +267,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
-			return &Success{Flag: false}, UNKOWN_ERROR
+			return &Success{Flag: false}, nil
 		}
 		client := NewRaftSurfstoreClient(conn)
 
@@ -325,7 +282,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		return &Success{Flag: true}, nil
 	}
 
-	return &Success{Flag: false}, UNKOWN_ERROR
+	return &Success{Flag: false}, nil
 }
 
 // ========== DO NOT MODIFY BELOW THIS LINE =====================================
