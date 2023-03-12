@@ -127,14 +127,14 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 
-	return nil, nil
+	return nil, UNKOWN_ERROR
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// send entry to all my followers and count the replies
-
 	responses := make(chan bool, len(s.peers)-1)
-	// contact all the follower, send some AppendEntries call
+
+	// contact all the follower, send some AppendEntries cal
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
 			continue
@@ -266,13 +266,17 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
+	
+	if err := s.CheckPreConditions(false, true); err != nil {
+		return &Success{Flag: false}, err
+	}
+	
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
 	s.term++
 
-	// TODO update state as per paper
-	return nil, nil
+	return &Success{Flag: true}, nil
 }
 
 func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {
@@ -306,7 +310,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
-			return &Success{Flag: false}, nil
+			return &Success{Flag: false}, UNKOWN_ERROR
 		}
 		client := NewRaftSurfstoreClient(conn)
 
@@ -321,7 +325,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		return &Success{Flag: true}, nil
 	}
 
-	return &Success{Flag: false}, nil
+	return &Success{Flag: false}, UNKOWN_ERROR
 }
 
 // ========== DO NOT MODIFY BELOW THIS LINE =====================================
