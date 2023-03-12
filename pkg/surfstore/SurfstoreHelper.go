@@ -78,7 +78,10 @@ func ServerFileUpload(clientMetaData *FileMetaData, filePath string, client RPCC
 
 	var blockStoreMap map[string][]string
 	log.Println("Fetching the servers for each block hash")
-	client.GetBlockStoreMap(hashes, &blockStoreMap)
+	if err := client.GetBlockStoreMap(hashes, &blockStoreMap); err != nil {
+		log.Println("Error while getting block store map", err)
+		return err
+	}
 	log.Println("Fetched the servers for each block hash->", blockStoreMap)
 	
 
@@ -352,7 +355,11 @@ func ClientFileDownload(serverMetaData *FileMetaData,  clientMetaData *FileMetaD
 
 	var blockStoreMap map[string][]string
 	log.Println("Fetching the servers for each block hash")
-	client.GetBlockStoreMap(blockHashesIn, &blockStoreMap)
+	if err := client.GetBlockStoreMap(blockHashesIn, &blockStoreMap); err != nil {
+		log.Println("Error while getting block store map", err)
+		return err
+	}
+
 	log.Println("Fetched the servers for each block hash->", blockStoreMap)
 
 	// if file is deleted

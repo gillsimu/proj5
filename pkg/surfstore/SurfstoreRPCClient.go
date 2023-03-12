@@ -88,7 +88,7 @@ func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr st
 }
 
 func KnownError(err error) bool {
-	if err == ERR_SERVER_CRASHED ||  err == ERR_NOT_LEADER {
+	if err.Error() == ERR_SERVER_CRASHED.Error() ||  err.Error() == ERR_NOT_LEADER.Error() {
 		return true;
 	}
 	return false
@@ -221,6 +221,7 @@ func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
+		fmt.Println("Error:", err)
 		if err != nil && !KnownError(err) {
 			conn.Close()
 			return err

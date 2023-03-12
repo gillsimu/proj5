@@ -81,7 +81,7 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
 	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
 	for {
-		if success, _ := s.SendHeartbeat(ctx, new(emptypb.Empty)); success.Flag {
+		if success, _ := s.SendHeartbeat(ctx, &emptypb.Empty{}); success.Flag {
 			return s.metaStore.GetBlockStoreMap(ctx, hashes)
 		}
 	}
@@ -165,6 +165,7 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 }
 
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, responses chan bool) {
+	
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term: s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
@@ -176,7 +177,10 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 	for {
 		// TODO check all errors
 		
-
+		if err := s.CheckPreConditions(false, true); err != nil {
+			responses <- false
+			return 
+		}
 		conn, _ := grpc.Dial(addr, grpc.WithInsecure())
 		client := NewRaftSurfstoreClient(conn)
 		
@@ -201,7 +205,17 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	if err := s.CheckPreConditions(false, true); err != nil {
-		return nil, ERR_SERVER_CRASHED
+		return &AppendEntryOutput{
+			Success:      false,
+			MatchedIndex: -1,
+		}, ERR_SERVER_CRASHED
+	}
+
+	if input.Term < s.term { 
+		return &AppendEntryOutput{
+			Success:      false,
+			MatchedIndex: -1,
+		}, ERR_SERVER_CRASHED
 	}
 
 	if input.Term > s.term {
@@ -212,12 +226,37 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	s.log = input.Entries
+	lastIndexMatchesLogs := int64(len(s.log) -1)
+	for id, log := range s.log{
+		if id >= len(input.Entries){
+			break
+		}
 
-	for s.lastApplied < input.LeaderCommit {
-		entry := s.log[s.lastApplied+1]
-		s.metaStore.UpdateFile(ctx, entry.FileMetaData)
-		s.lastApplied++
+		if log == input.Entries[id] {
+			s.lastApplied = int64(id)
+			lastIndexMatchesLogs = int64(id)
+		} else {
+			break
+		}
+	}
+
+	s.log = s.log[:lastIndexMatchesLogs + 1]
+	if lastIndexMatchesLogs < int64(len(input.Entries)) { 
+		s.log = append(s.log, input.Entries[lastIndexMatchesLogs + 1:]...)
+	} else {
+		s.log = append(s.log, make([]*UpdateOperation, 0)...)
+	}
+
+	if s.commitIndex < input.LeaderCommit  {
+		s.commitIndex = int64(len(s.log)-1)
+		if s.commitIndex > int64(input.LeaderCommit) {
+			s.commitIndex = int64(input.LeaderCommit)
+		}
+		for s.lastApplied < s.commitIndex {
+			entry := s.log[s.lastApplied+1]
+			s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+			s.lastApplied++
+		}
 	}
 
 	return &AppendEntryOutput{
