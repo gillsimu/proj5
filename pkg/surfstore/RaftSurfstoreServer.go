@@ -2,9 +2,11 @@ package surfstore
 
 import (
 	context "context"
+	"sync"
+	"time"
+
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	"sync"
 )
 
 type RaftSurfstore struct {
@@ -28,13 +30,14 @@ type RaftSurfstore struct {
 	UnimplementedRaftSurfstoreServer
 }
 
-func (s *RaftSurfstore) CheckPreConditions() error {
+
+func (s *RaftSurfstore) CheckPreConditions(checkLeader bool, checkServerHealth bool) error {
 	// check if server is leader or not
 	s.isLeaderMutex.RLock()
 	defer s.isLeaderMutex.RUnlock()
 	isServerLeader := s.isLeader
 	
-	if !isServerLeader {
+	if checkLeader && !isServerLeader {
 		return ERR_NOT_LEADER
 	}
 
@@ -43,7 +46,7 @@ func (s *RaftSurfstore) CheckPreConditions() error {
 	defer s.isCrashedMutex.RUnlock()
 	isCrashed := s.isCrashed
 	
-	if isCrashed {
+	if checkServerHealth && isCrashed {
 		return ERR_SERVER_CRASHED
 	}
 
@@ -52,7 +55,7 @@ func (s *RaftSurfstore) CheckPreConditions() error {
 
 
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
-	if err := s.CheckPreConditions(); err != nil {
+	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +72,7 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
-	if err := s.CheckPreConditions(); err != nil {
+	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +88,7 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
-	if err := s.CheckPreConditions(); err != nil {
+	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
 	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
@@ -100,7 +103,7 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	if err := s.CheckPreConditions(); err != nil {
+	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
 
@@ -115,13 +118,12 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	// send entry to all followers in parallel
 	go s.sendToAllFollowersInParallel(ctx)
 
-	// keep trying indefinitely (even after responding) ** rely on sendheartbeat
-
 	// commit the entry once majority of followers have it in their log
 	commit := <-commitChan
 
 	// once committed, apply to the state machine
 	if commit {
+		s.lastApplied = s.commitIndex
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 
@@ -157,32 +159,36 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	}
 
 	if totalAppends > len(s.peers)/2 {
-		// TODO put on correct channel
-		*s.pendingCommits[0] <- true
-		// TODO update commit Index correctly
-		s.commitIndex = 0
+		*s.pendingCommits[len(s.pendingCommits)-1] <- true
+		s.commitIndex = s.commitIndex + 1
 	}
 }
 
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, responses chan bool) {
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term: s.term,
-		// TODO put the right values
-		PrevLogTerm:  -1,
-		PrevLogIndex: -1,
-		Entries:      s.log,
+		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
+		PrevLogIndex: s.commitIndex,
+		Entries:      s.log, //TODO check this
 		LeaderCommit: s.commitIndex,
 	}
 
-	// TODO check all errors
-	conn, _ := grpc.Dial(addr, grpc.WithInsecure())
-	client := NewRaftSurfstoreClient(conn)
+	for {
+		// TODO check all errors
+		
 
-	_, _ = client.AppendEntries(ctx, &dummyAppendEntriesInput)
-
-	// TODO check output
+		conn, _ := grpc.Dial(addr, grpc.WithInsecure())
+		client := NewRaftSurfstoreClient(conn)
+		
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		
+		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
+			break
+		}
+	
+	}
 	responses <- true
-
 }
 
 // 1. Reply false if term < currentTerm (§5.1)
@@ -194,6 +200,9 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
+	if err := s.CheckPreConditions(false, true); err != nil {
+		return nil, ERR_SERVER_CRASHED
+	}
 
 	if input.Term > s.term {
 		s.isLeaderMutex.Lock()
@@ -211,7 +220,10 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		s.lastApplied++
 	}
 
-	return nil, nil
+	return &AppendEntryOutput{
+		Success:      true,
+		MatchedIndex: -1,
+	}, nil
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
@@ -232,7 +244,7 @@ func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {
 }
 
 func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
-	if err := s.CheckPreConditions(); err != nil {
+	if err := s.CheckPreConditions(true, true); err != nil {
 		return &Success{Flag: false}, err
 	}
 
