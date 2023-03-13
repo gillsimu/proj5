@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"math"
 	"sync"
 	"time"
 
@@ -173,22 +174,33 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		LeaderCommit: s.commitIndex,
 	}
 
-	for {
+	if err := s.CheckPreConditions(false, true); err != nil {
+		responses <- false
+		return;
+	}
+	// for {
 		// TODO check all errors
 		
 
-		conn, _ := grpc.Dial(addr, grpc.WithInsecure())
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			responses <- false
+			return;
+		}
+
 		client := NewRaftSurfstoreClient(conn)
 		
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		
 		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
-			break
+			responses <- true
+		} else {
+			responses <- false
 		}
 	
-	}
-	responses <- true
+	// }
+	
 }
 
 // 1. Reply false if term < currentTerm (Â§5.1)
@@ -212,13 +224,41 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	s.log = input.Entries
-
-	for s.lastApplied < input.LeaderCommit {
-		entry := s.log[s.lastApplied+1]
-		s.metaStore.UpdateFile(ctx, entry.FileMetaData)
-		s.lastApplied++
+	for index, logEntry := range s.log {
+		s.lastApplied = int64(index - 1)
+		if len(input.Entries) < index+1 {
+			s.log = s.log[:index]
+			input.Entries = make([]*UpdateOperation, 0)
+			break
+		}
+		if logEntry != input.Entries[index] {
+			s.log = s.log[:index]
+			input.Entries = input.Entries[index:]
+			break
+		}
+		if len(s.log) == index+1 { //last iteration, all match
+			input.Entries = input.Entries[index+1:]
+		}
 	}
+	//4. Append any new entries not already in the log
+	s.log = append(s.log, input.Entries...)
+	
+	//TODO
+	if input.LeaderCommit > s.commitIndex {
+		s.commitIndex = int64(math.Min(float64(input.LeaderCommit), float64(len(s.log)-1)))
+
+		for s.lastApplied < s.commitIndex {
+			s.lastApplied++
+			entry := s.log[s.lastApplied]
+			s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+		}
+	}
+
+	// for s.lastApplied < input.LeaderCommit {
+	// 	entry := s.log[s.lastApplied+1]
+	// 	s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+	// 	s.lastApplied++
+	// }
 
 	return &AppendEntryOutput{
 		Success:      true,
@@ -227,13 +267,16 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
+	if err := s.CheckPreConditions(false, true); err != nil {
+		return &Success{Flag: false}, ERR_SERVER_CRASHED
+	}
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
 	s.term++
 
 	// TODO update state as per paper
-	return nil, nil
+	return &Success{Flag: true}, nil
 }
 
 func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {

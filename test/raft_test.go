@@ -63,7 +63,7 @@ func TestRaftSetLeader(t *testing.T) {
 	}
 }
 
-func TestRaftRecoverable(t *testing.T) {
+func TestRaftNewLeaderPushesUpdates(t *testing.T) {
 	//Setup
 	cfgPath := "./config_files/3nodes.txt"
 	test := InitTest(cfgPath)
@@ -72,34 +72,99 @@ func TestRaftRecoverable(t *testing.T) {
 	goldenLog := make([]*surfstore.UpdateOperation, 0)
 	goldenMeta := make(map[string]*surfstore.FileMetaData)
 
-	term := int64(1)
-	leader := bool(true)
-	_, err := CheckInternalState(&leader, &term, goldenLog, goldenMeta, test.Clients[0], test.Context)
+	
 
 	// TEST
 	leaderIdx := 0
 	test.Clients[leaderIdx].SetLeader(test.Context, &emptypb.Empty{})
 
 	// heartbeat
-	for _, server := range test.Clients {
-		server.SendHeartbeat(test.Context, &emptypb.Empty{})
-	}
-
-	// test.Clients[1].Crash(test.Context, &emptypb.Empty{})
-	// test.Clients[2].Crash(test.Context, &emptypb.Empty{})
-
-	// // update a file on node 0
-	// filemeta := &surfstore.FileMetaData{
-	// 	Filename:      "testfile",
-	// 	Version:       1,
-	// 	BlockHashList: nil,
+	// for _, server := range test.Clients {
+	// 	server.SendHeartbeat(test.Context, &emptypb.Empty{})
 	// }
 
-	// test.Clients[leaderIdx].UpdateFile(test.Context, filemeta)
-
-	// test.Clients[1].Restore(test.Context, &emptypb.Empty{})
-	// test.Clients[2].Restore(test.Context, &emptypb.Empty{})
 	
+	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
+
+	// update a file on node 0
+	filemeta := &surfstore.FileMetaData{
+		Filename:      "testfile",
+		Version:       1,
+		BlockHashList: nil,
+	}
+
+	test.Clients[leaderIdx].UpdateFile(test.Context, filemeta)
+
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+
+	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
+	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
+	
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+
+	term := int64(1)
+	leader := bool(true)
+	_, err := CheckInternalState(&leader, &term, goldenLog, goldenMeta, test.Clients[0], test.Context)
+
+	if err != nil {
+		t.Fatalf("Error checking state for server %d: %s", 0, err.Error())
+	}
+	
+}
+
+func TestRaftLogsConsistent(t *testing.T) {
+	//Setup
+	cfgPath := "./config_files/3nodes.txt"
+	test := InitTest(cfgPath)
+	defer EndTest(test)
+
+	goldenLog := make([]*surfstore.UpdateOperation, 0)
+	goldenMeta := make(map[string]*surfstore.FileMetaData)
+
+	
+
+	// TEST
+	leaderIdx := 0
+	test.Clients[leaderIdx].SetLeader(test.Context, &emptypb.Empty{})
+
+	// heartbeat
+	// for _, server := range test.Clients {
+	// 	server.SendHeartbeat(test.Context, &emptypb.Empty{})
+	// }
+
+	
+	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
+
+	// update a file on node 0
+	filemeta := &surfstore.FileMetaData{
+		Filename:      "testfile",
+		Version:       1,
+		BlockHashList: nil,
+	}
+
+	test.Clients[leaderIdx].UpdateFile(test.Context, filemeta)
+
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+
+	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
+	
+	leaderIdx = 1
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+	// update a file on node 0
+	filemeta2 := &surfstore.FileMetaData{
+		Filename:      "testfile2",
+		Version:       1,
+		BlockHashList: nil,
+	}
+
+	test.Clients[leaderIdx].UpdateFile(test.Context, filemeta2)
+
+	test.Clients[0].Restore(test.Context, &emptypb.Empty{})
+
+	term := int64(1)
+	leader := bool(true)
+	_, err := CheckInternalState(&leader, &term, goldenLog, goldenMeta, test.Clients[0], test.Context)
 
 	if err != nil {
 		t.Fatalf("Error checking state for server %d: %s", 0, err.Error())
