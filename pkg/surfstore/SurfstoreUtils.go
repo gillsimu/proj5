@@ -55,9 +55,9 @@ func ClientSync(client RPCClient) {
 			}
 		}
 	}
-	log.Println("**************clientFileInfoMap after reconciling with fileMetaMapMetaFile for updates****************")
-	PrintMetaMap(clientFileInfoMap)
-	log.Println("*******************************************")
+	// log.Println("**************clientFileInfoMap after reconciling with fileMetaMapMetaFile for updates****************")
+	// PrintMetaMap(clientFileInfoMap)
+	// log.Println("*******************************************")
 
 	// Step: 3(B) handling deletes
 	for filename, clientMetaData := range clientFileInfoMap {
@@ -74,9 +74,9 @@ func ClientSync(client RPCClient) {
 			
 		}
 	}
-	log.Println("**************clientFileInfoMap after reconciling with fileMetaMapMetaFile for deletes***************")
-	PrintMetaMap(clientFileInfoMap)
-	log.Println("*******************************************")
+	// log.Println("**************clientFileInfoMap after reconciling with fileMetaMapMetaFile for deletes***************")
+	// PrintMetaMap(clientFileInfoMap)
+	// log.Println("*******************************************")
 
 	// Step: 4 get serverFileInfoMap
 	serverFileInfoMap := make(map[string]*FileMetaData)
@@ -84,9 +84,9 @@ func ClientSync(client RPCClient) {
 	if err != nil {
 		log.Println("Error while getting server file info map", err)
 	}
-	log.Println("**************Initial serverFileInfoMap***************")
-	PrintMetaMap(serverFileInfoMap)
-	log.Println("*******************************************")
+	// log.Println("**************Initial serverFileInfoMap***************")
+	// PrintMetaMap(serverFileInfoMap)
+	// log.Println("*******************************************")
 
 	// Step: 5 Compare serverFileInfoMap with clientFileInfoMap
 	// Step: 5(a) clientFileInfoMap has new/updated files, so upload them in the server and then update serverFileInfoMap
@@ -107,12 +107,12 @@ func ClientSync(client RPCClient) {
 		log.Println("Error while getting server file info map", err)
 	}
 
-	log.Println("**************clientFileInfoMap after reconciling with serverFileInfoMap for update/new/delete file***************")
-	PrintMetaMap(clientFileInfoMap)
-	log.Println("*******************************************")
-	log.Println("**************serverFileInfoMap after reconciling with clientFileInfoMap for update/new/delete file***************")
-	PrintMetaMap(serverFileInfoMap)
-	log.Println("*******************************************")
+	// log.Println("**************clientFileInfoMap after reconciling with serverFileInfoMap for update/new/delete file***************")
+	// PrintMetaMap(clientFileInfoMap)
+	// log.Println("*******************************************")
+	// log.Println("**************serverFileInfoMap after reconciling with clientFileInfoMap for update/new/delete file***************")
+	// PrintMetaMap(serverFileInfoMap)
+	// log.Println("*******************************************")
 
 	// log.Println("***********serverFileInfoMap has new/updated files, so download them in the clients local and then update clientFileInfoMap")
 	// Step: 5(b) serverFileInfoMap has new/updated files, so download them in the clients local and then update clientFileInfoMap
@@ -135,9 +135,9 @@ func ClientSync(client RPCClient) {
 		}
 	}
 
-	log.Println("**************clientFileInfoMap after reconciling with serverFileInfoMap for update/new/delete file***************")
-	PrintMetaMap(clientFileInfoMap)
-	log.Println("*******************************************")
+	// log.Println("**************clientFileInfoMap after reconciling with serverFileInfoMap for update/new/delete file***************")
+	// PrintMetaMap(clientFileInfoMap)
+	// log.Println("*******************************************")
 
 	// Update clients index.db
 	WriteMetaFile(clientFileInfoMap, baseDir)

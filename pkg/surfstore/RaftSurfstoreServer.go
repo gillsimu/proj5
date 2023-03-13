@@ -2,7 +2,7 @@ package surfstore
 
 import (
 	context "context"
-	"math"
+	// "math"
 	"sync"
 	"time"
 
@@ -128,13 +128,13 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 
-	return nil, nil
+	return nil, UNKOWN_ERROR
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// send entry to all my followers and count the replies
-
-	responses := make(chan bool, len(s.peers)-1)
+	responses := make(chan bool, len(s.peers))
+	
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
@@ -224,33 +224,36 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	for index, logEntry := range s.log {
-		s.lastApplied = int64(index - 1)
-		if len(input.Entries) < index+1 {
-			s.log = s.log[:index]
-			input.Entries = make([]*UpdateOperation, 0)
+	lastIndexMatchesLogs := int64(len(s.log) -1)
+	for id, log := range s.log{
+		if id >= len(input.Entries){
 			break
 		}
-		if logEntry != input.Entries[index] {
-			s.log = s.log[:index]
-			input.Entries = input.Entries[index:]
+
+		if log == input.Entries[id] {
+			s.lastApplied = int64(id)
+			lastIndexMatchesLogs = int64(id)
+		} else {
 			break
-		}
-		if len(s.log) == index+1 { //last iteration, all match
-			input.Entries = input.Entries[index+1:]
 		}
 	}
-	//4. Append any new entries not already in the log
-	s.log = append(s.log, input.Entries...)
-	
-	//TODO
-	if input.LeaderCommit > s.commitIndex {
-		s.commitIndex = int64(math.Min(float64(input.LeaderCommit), float64(len(s.log)-1)))
 
+	s.log = s.log[:lastIndexMatchesLogs + 1]
+	if lastIndexMatchesLogs < int64(len(input.Entries)) { 
+		s.log = append(s.log, input.Entries[lastIndexMatchesLogs + 1:]...)
+	} else {
+		s.log = append(s.log, make([]*UpdateOperation, 0)...)
+	}
+
+	if s.commitIndex < input.LeaderCommit  {
+		s.commitIndex = int64(len(s.log)-1)
+		if s.commitIndex > int64(input.LeaderCommit) {
+			s.commitIndex = int64(input.LeaderCommit)
+		}
 		for s.lastApplied < s.commitIndex {
-			s.lastApplied++
-			entry := s.log[s.lastApplied]
+			entry := s.log[s.lastApplied+1]
 			s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+			s.lastApplied++
 		}
 	}
 
@@ -314,8 +317,8 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		}
 		client := NewRaftSurfstoreClient(conn)
 
-		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
-		if appendEntryOutput != nil {
+		_, err = client.AppendEntries(ctx, &dummyAppendEntriesInput)
+		if err == nil {
 			noOfNodesDead--;
 		}
 	}
