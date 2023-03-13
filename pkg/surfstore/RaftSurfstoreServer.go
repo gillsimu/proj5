@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"fmt"
 	// "math"
 	"sync"
 	"time"
@@ -133,7 +134,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// send entry to all my followers and count the replies
-	responses := make(chan bool, len(s.peers))
+	responses := make(chan bool, len(s.peers)-1)
 	
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
@@ -174,18 +175,22 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		LeaderCommit: s.commitIndex,
 	}
 
-	if err := s.CheckPreConditions(false, true); err != nil {
-		responses <- false
-		return;
-	}
-	// for {
+	
+	for {
 		// TODO check all errors
-		
+		if err := s.CheckPreConditions(false, true); err != nil {
+			// responses <- false
+			// return;
+			fmt.Println("PreCheck failed")
+			continue
+		}
 
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
+			fmt.Println("Dialing failed")
 			responses <- false
 			return;
+			// continue
 		}
 
 		client := NewRaftSurfstoreClient(conn)
@@ -194,12 +199,13 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		defer cancel()
 		
 		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
+			fmt.Println("Success")
 			responses <- true
 		} else {
 			responses <- false
-		}
-	
-	// }
+		} 
+		return
+	}
 	
 }
 
