@@ -205,27 +205,26 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 
 		client := NewRaftSurfstoreClient(conn)
 
-		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
-		defer cancel()
+		// ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
+		// defer cancel()
 
 		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
 
-		if ctx2.Err() != nil {
-			fmt.Println("AppendEntries Context timed out")
-			responses <- false
-			return
-		}
+		// if ctx2.Err() != nil {
+		// 	fmt.Println("AppendEntries Context timed out")
+		// 	responses <- false
+		// 	return
+		// }
 
 		if appendEntryOutput != nil && appendEntryOutput.Success {
 			fmt.Println("Success to append entries for server address:" , addr)
 			responses <- true
 			return
-		} 
-		// else {
-		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
-		// 	responses <- false
-		// 	return
-		// }
+		} else if appendEntryOutput != nil && err != nil && err.Error() == UNKOWN_ERROR.Error(){
+			fmt.Println("Server rejected the append entry, ", s.id, " err:", err)
+			responses <- false
+			return
+		}
 		
 	}
 }
@@ -267,7 +266,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// TODO actually check entries
 	someMatchingEntries := false
-	lastMatchedIndexInputEntries := int64(-1)
+	lastMatchedIndexInputEntries := int64(-1) // 
 	for id, log := range s.log {
 		if id < len(input.Entries){
 			if log == input.Entries[id] {
