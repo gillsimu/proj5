@@ -128,13 +128,17 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		if err != nil {
 			return err
 		}
-		c := NewRaftSurfstoreClient(conn)
+		client := NewRaftSurfstoreClient(conn)
 
 		// perform the call
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		b, err := c.UpdateFile(ctx, fileMetaData)
-		if err != nil && !KnownError(err) {
+		b, err := client.UpdateFile(ctx, fileMetaData)
+		fmt.Println("Error while updating file", err, " new file version:", b.Version)
+		if err != nil{
+			if(KnownError(err)){
+				continue
+			}
 			conn.Close()
 			return err
 		}
@@ -186,7 +190,10 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 			Hashes: blockHashesIn,
 		}
 		b, err := c.GetBlockStoreMap(ctx, &tempBlockHash)
-		if err != nil && !KnownError(err) {
+		if err != nil{
+			if(KnownError(err)){
+				continue
+			}
 			conn.Close()
 			return err
 		}
@@ -222,7 +229,10 @@ func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error
 		defer cancel()
 		b, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
 		fmt.Println("Error:", err)
-		if err != nil && !KnownError(err) {
+		if err != nil{
+			if(KnownError(err)){
+				continue
+			}
 			conn.Close()
 			return err
 		}
