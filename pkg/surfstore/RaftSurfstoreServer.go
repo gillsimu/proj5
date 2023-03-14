@@ -224,7 +224,6 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 			responses <- false
 			return
 		}
-		
 	}
 }
 
