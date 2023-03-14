@@ -225,7 +225,8 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		// } 
 		// return
 	}
-	
+	responses <- false
+	return
 }
 
 // 1. Reply false if term < currentTerm (§5.1)
