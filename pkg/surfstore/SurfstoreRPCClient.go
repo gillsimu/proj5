@@ -142,7 +142,8 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		if ctx.Err() != nil {
 			fmt.Println("Update File Context timed out")
 			log.Fatalf("Update File Context timed out Error while getting UpdateFile")
-			return UNKOWN_ERROR
+			conn.Close()
+			return ctx.Err()
 		}
 		if err != nil {
 			fmt.Println("Error while updating file", err)

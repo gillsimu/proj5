@@ -1,9 +1,10 @@
-
 package surfstore
 
 import (
 	context "context"
 	"fmt"
+	"strings"
+
 	// "math"
 
 	// "log"
@@ -219,7 +220,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 			fmt.Println("Success to append entries for server address:" , addr)
 			responses <- true
 			return
-		} else if appendEntryOutput != nil && err != nil && err.Error() == UNKOWN_ERROR.Error(){
+		} else if appendEntryOutput != nil && err != nil && strings.Contains(err.Error(), UNKOWN_ERROR.Error()){
 			fmt.Println("Server rejected the append entry, ", s.id, " err:", err)
 			responses <- false
 			return
