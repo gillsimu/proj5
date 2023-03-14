@@ -268,12 +268,13 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	lastIndexMatchesLogs := int64(len(s.log) - 1)
+	lastIndexMatchesLogs := int64(0)
 	for id, log := range s.log {
 		if id >= len(input.Entries) {
 			break
 		}
 
+		// if log == input.Entries[id] && log.Term == input.Entries[id].Term && log.GetFileMetaData() == input.Entries[id].GetFileMetaData(){
 		if log == input.Entries[id] {
 			s.lastApplied = int64(id)
 			lastIndexMatchesLogs = int64(id)
