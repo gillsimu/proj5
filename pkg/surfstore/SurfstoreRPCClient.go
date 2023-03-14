@@ -122,6 +122,7 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 	return UNKOWN_ERROR
 }
 
+
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
 	fmt.Println("-----Update file-----")
 	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
@@ -158,6 +159,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 	log.Fatalf("Error while getting UpdateFile:")
 	return UNKOWN_ERROR
 }
+
 
 func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *[]string) error {
 	// connect to the server
