@@ -77,6 +77,8 @@ func TestRaftNewLeaderPushesUpdates(t *testing.T) {
 	// TEST
 	leaderIdx := 0
 	test.Clients[leaderIdx].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[leaderIdx].SendHeartbeat(test.Context, &emptypb.Empty{})
+
 
 	// heartbeat
 	// for _, server := range test.Clients {
@@ -102,6 +104,7 @@ func TestRaftNewLeaderPushesUpdates(t *testing.T) {
 	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
 	
 	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
 	term := int64(1)
 	leader := bool(true)
@@ -186,12 +189,7 @@ func TestRaftRecoverable(t *testing.T) {
 	// TEST
 	leaderIdx := 0
 	test.Clients[leaderIdx].SetLeader(test.Context, &emptypb.Empty{})
-
-	// heartbeat
-	// for _, server := range test.Clients {
-	// 	server.SendHeartbeat(test.Context, &emptypb.Empty{})
-	// }
-
+	test.Clients[leaderIdx].SendHeartbeat(test.Context, &emptypb.Empty{})
 	
 	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
 	test.Clients[2].Crash(test.Context, &emptypb.Empty{})

@@ -189,7 +189,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 	for {
 		// TODO check all errors
 		if err := s.CheckPreConditions(false, true); err != nil {
-			// responses <- false
+			responses <- false //TODO
 			// return;
 			fmt.Println("Pre Check failed")
 			continue
@@ -204,20 +204,26 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		}
 
 		client := NewRaftSurfstoreClient(conn)
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput) 
+		fmt.Println("appendEntryOutput:", err.Error())
+		// if appendEntryOutput == nil {
+		// 	continue
+		// }
 
-		if err == nil && appendEntryOutput.Success {
+		if appendEntryOutput!=nil && appendEntryOutput.Success {
 			fmt.Println("Success to append entries for server:", s.id)
 			responses <- true
-		} else {
-			fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
-			responses <- false
+			return
 		} 
-		return
+		// else {
+		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
+		// 	responses <- false
+		// } 
+		// return
 	}
 	
 }
@@ -233,7 +239,9 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	if err := s.CheckPreConditions(false, true); err != nil {
 		fmt.Println(s.id, "Pre condition check failed: ", err)
-		return nil, ERR_SERVER_CRASHED
+		return &AppendEntryOutput{
+			Success:      false,
+		}, ERR_SERVER_CRASHED
 	}
 
 	// 1. Reply false if term < currentTerm (§5.1)
@@ -366,7 +374,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	if noOfNodesAlive > countOfMajorityNodes {
 		return &Success{Flag: true}, nil
 	}
-	
+	log.Fatal("Failure")
 	return &Success{Flag: false}, nil
 }
 

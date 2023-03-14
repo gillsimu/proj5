@@ -3,6 +3,7 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"log"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -116,7 +117,7 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 		// close the connection
 		return conn.Close()
 	}
-	fmt.Println("Error while getting fileInfoMap:")
+	log.Fatalf("Error while getting fileInfoMap:")
 	return UNKOWN_ERROR
 }
 
@@ -134,8 +135,9 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := client.UpdateFile(ctx, fileMetaData)
-		fmt.Println("Error while updating file", err, " new file version:", b.Version)
+		
 		if err != nil {
+			fmt.Println("Error while updating file", err)
 			// if(KnownError(err)){
 			// 	continue
 			// }
@@ -149,7 +151,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		// close the connection
 		return conn.Close()
 	}
-	fmt.Println("Error while getting UpdateFile:")
+	log.Fatalf("Error while getting UpdateFile:")
 	return UNKOWN_ERROR
 }
 
@@ -214,7 +216,7 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 		// close the connection
 		return conn.Close()
 	}
-	fmt.Println("Error while getting GetBlockStoreMap:")
+	log.Fatalf("Error while getting GetBlockStoreMap:")
 	return UNKOWN_ERROR
 }
 
@@ -240,7 +242,7 @@ func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error
 		// close the connection
 		return conn.Close()
 	}
-	fmt.Println("Error while getting GetBlockStoreAddrs:")
+	log.Fatalf("Error while getting GetBlockStoreAddrs:")
 	return UNKOWN_ERROR
 }
 
