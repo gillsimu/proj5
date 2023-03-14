@@ -204,7 +204,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 
 		client := NewRaftSurfstoreClient(conn)
 
-		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
+		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/25)
 		defer cancel()
 
 		appendEntryOutput, _ := client.AppendEntries(ctx2, &dummyAppendEntriesInput)
