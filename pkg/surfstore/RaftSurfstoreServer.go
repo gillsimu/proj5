@@ -373,7 +373,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	if noOfNodesAlive > countOfMajorityNodes {
 		return &Success{Flag: true}, nil
 	}
-	log.Fatal("Failure")
+	// log.Fatal("Failure")
 	return &Success{Flag: false}, nil
 }
 
