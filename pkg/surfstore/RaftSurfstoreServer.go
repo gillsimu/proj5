@@ -3,6 +3,8 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"log"
+
 	// "math"
 	"sync"
 	"time"
@@ -128,7 +130,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		s.lastApplied = s.commitIndex
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
-
+	log.Fatalf("UNKOWN_ERROR")
 	return nil, UNKOWN_ERROR
 }
 
@@ -201,7 +203,8 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
 			fmt.Println("Success")
 			responses <- true
-		} else {
+		} 
+		else {
 			responses <- false
 		} 
 		return
