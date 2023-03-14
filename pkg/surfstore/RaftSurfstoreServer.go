@@ -243,11 +243,16 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 
-	if err := s.CheckPreConditions(false, true); err != nil {
-		fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
-		return &AppendEntryOutput{
-			Success: false,
-		}, ERR_SERVER_CRASHED
+	for {
+		// if err := s.CheckPreConditions(false, true); err != nil {
+		// 	fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
+		// 	return &AppendEntryOutput{
+		// 		Success: false,
+		// 	}, ERR_SERVER_CRASHED
+		// }
+		if err := s.CheckPreConditions(false, true); err == nil {
+			break;
+		}
 	}
 
 	// 1. Reply false if term < currentTerm (§5.1)
