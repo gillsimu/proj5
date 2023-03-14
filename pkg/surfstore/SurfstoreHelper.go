@@ -298,6 +298,7 @@ func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData,
 }
 
 func LoadMetaFromMetaDirectory(baseDir string, blockSize int) (fileMetaMap map[string]*FileMetaData, e error) {
+	fmt.Println("Loading Meta data from directory")
 	// check if path is correct
 	fileMetaMap = make(map[string]*FileMetaData)
 	f,_ := filepath.Abs(baseDir)

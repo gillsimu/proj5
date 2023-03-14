@@ -11,8 +11,8 @@ import (
 
 type RPCClient struct {
 	MetaStoreAddrs []string
-	BaseDir       string
-	BlockSize     int
+	BaseDir        string
+	BlockSize      int
 }
 
 func (surfClient *RPCClient) GetBlock(blockHash string, blockStoreAddr string, block *Block) error {
@@ -76,7 +76,7 @@ func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr st
 		Hashes: blockHashesIn,
 	}
 	b, err := c.HasBlocks(ctx, &tempBlockHash)
-	
+
 	if err != nil {
 		conn.Close()
 		return err
@@ -88,19 +88,19 @@ func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr st
 }
 
 func KnownError(err error) bool {
-	if err.Error() == ERR_SERVER_CRASHED.Error() ||  err.Error() == ERR_NOT_LEADER.Error() {
-		return true;
+	if err.Error() == ERR_SERVER_CRASHED.Error() || err.Error() == ERR_NOT_LEADER.Error() {
+		return true
 	}
 	return false
 }
 
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
-	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
 		// connect to the server
 		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
 		if err != nil {
-			return err
+			continue
 		}
 		c := NewRaftSurfstoreClient(conn)
 
@@ -108,20 +108,20 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
-		if err != nil && !KnownError(err) {
-			conn.Close()
-			return err
+		if err != nil {
+			continue
 		}
 		*serverFileInfoMap = b.FileInfoMap
 
 		// close the connection
 		return conn.Close()
 	}
+	fmt.Println("Error while getting fileInfoMap:")
 	return UNKOWN_ERROR
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
-	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
 		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
@@ -135,21 +135,23 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		defer cancel()
 		b, err := client.UpdateFile(ctx, fileMetaData)
 		fmt.Println("Error while updating file", err, " new file version:", b.Version)
-		if err != nil{
-			if(KnownError(err)){
-				continue
-			}
-			conn.Close()
-			return err
+		if err != nil {
+			// if(KnownError(err)){
+			// 	continue
+			// }
+			// fmt.Println("Error while getting UpdateFile:", err)
+			// conn.Close()
+			// return err
+			continue
 		}
 		*latestVersion = b.Version
 
 		// close the connection
 		return conn.Close()
 	}
+	fmt.Println("Error while getting UpdateFile:")
 	return UNKOWN_ERROR
 }
-
 
 func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *[]string) error {
 	// connect to the server
@@ -161,13 +163,13 @@ func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *
 	// perform the call
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	
+
 	b, err := c.GetBlockHashes(ctx, &emptypb.Empty{})
 	if err != nil {
 		conn.Close()
 		return err
 	}
-	
+
 	*blockHashes = b.Hashes
 
 	// close the connection
@@ -175,7 +177,7 @@ func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *
 }
 
 func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStoreMap *map[string][]string) error {
-	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
 		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
@@ -190,21 +192,21 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 			Hashes: blockHashesIn,
 		}
 		b, err := c.GetBlockStoreMap(ctx, &tempBlockHash)
-		if err != nil{
-			if(KnownError(err)){
-				continue
-			}
-			conn.Close()
-			return err
+		if err != nil {
+			// if(KnownError(err)){
+			// 	continue
+			// }
+			// fmt.Print("Error while getting GetBlockStoreMap:", err)
+			// conn.Close()
+			// return err
+			continue
 		}
-		
+
 		m := make(map[string][]string)
 
 		for key, val := range b.BlockStoreMap {
 			hashes := []string{}
-			for _, v := range val.Hashes {
-				hashes = append(hashes, v)
-			}
+			hashes = append(hashes, val.Hashes...)
 			m[key] = hashes
 		}
 		*blockStoreMap = m
@@ -212,11 +214,12 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 		// close the connection
 		return conn.Close()
 	}
+	fmt.Println("Error while getting GetBlockStoreMap:")
 	return UNKOWN_ERROR
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
-	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs{
+	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
 		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
@@ -229,21 +232,17 @@ func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error
 		defer cancel()
 		b, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
 		fmt.Println("Error:", err)
-		if err != nil{
-			if(KnownError(err)){
-				continue
-			}
-			conn.Close()
-			return err
+		if err != nil {
+			continue
 		}
 		*blockStoreAddrs = b.BlockStoreAddrs
 
 		// close the connection
 		return conn.Close()
 	}
+	fmt.Println("Error while getting GetBlockStoreAddrs:")
 	return UNKOWN_ERROR
 }
-
 
 // This line guarantees all method for RPCClient are implemented
 var _ ClientInterface = new(RPCClient)
@@ -251,8 +250,8 @@ var _ ClientInterface = new(RPCClient)
 // Create an Surfstore RPC client
 func NewSurfstoreRPCClient(addrs []string, baseDir string, blockSize int) RPCClient {
 	return RPCClient{
-			MetaStoreAddrs: addrs,
-			BaseDir:       baseDir,
-			BlockSize:     blockSize,
+		MetaStoreAddrs: addrs,
+		BaseDir:        baseDir,
+		BlockSize:      blockSize,
 	}
 }
