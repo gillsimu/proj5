@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -161,7 +162,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		return conn.Close()
 	}
 	log.Fatalf("Error while getting UpdateFile:")
-	return UNKOWN_ERROR
+	return errors.New("CLuster issue Error while getting UpdateFile")
 }
 
 
