@@ -96,6 +96,7 @@ func KnownError(err error) bool {
 }
 
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
+	fmt.Println("-----Getting file InfoMap-----")
 	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
 		// connect to the server
@@ -122,6 +123,7 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
+	fmt.Println("-----Update file-----")
 	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
@@ -135,7 +137,9 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := client.UpdateFile(ctx, fileMetaData)
-		
+		if ctx.Err() != nil {
+			fmt.Println("Update File Context timed out")
+		}
 		if err != nil {
 			fmt.Println("Error while updating file", err)
 			// if(KnownError(err)){
@@ -179,6 +183,7 @@ func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *
 }
 
 func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStoreMap *map[string][]string) error {
+	fmt.Println("-----GetBlockStoreMap-----")
 	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
@@ -221,6 +226,7 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
+	fmt.Println("-----GetBlockStoreAddrs-----")
 	for idx, metaStoreAddr := range surfClient.MetaStoreAddrs {
 		// connect to the server
 		fmt.Println("id:", idx, " metaStoreAddr:", metaStoreAddr)
