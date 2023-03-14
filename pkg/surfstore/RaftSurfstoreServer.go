@@ -135,7 +135,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		fmt.Println("Leader new commitIndex:", s.commitIndex," lastApplied:", s.lastApplied, " term:", s.term)
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
-	log.Fatalf("UNKOWN_ERROR")
+	// log.Fatalf("UNKOWN_ERROR")
 	return nil, UNKOWN_ERROR
 }
 
