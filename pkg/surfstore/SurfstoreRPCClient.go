@@ -134,7 +134,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		client := NewRaftSurfstoreClient(conn)
 
 		// perform the call
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := client.UpdateFile(ctx, fileMetaData)
 		if ctx.Err() != nil {
