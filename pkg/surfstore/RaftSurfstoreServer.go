@@ -3,7 +3,7 @@ package surfstore
 import (
 	context "context"
 	"fmt"
-	"log"
+	// "log"
 
 	// "math"
 	"sync"
