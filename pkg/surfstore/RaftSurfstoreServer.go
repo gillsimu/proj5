@@ -16,8 +16,8 @@ import (
 type RaftSurfstore struct {
 	isLeader      bool
 	isLeaderMutex *sync.RWMutex
-	term          int64
-	log           []*UpdateOperation
+	term          int64					// latest term server has seen (initialized to 0) on first boot, increases monotonically
+	log           []*UpdateOperation	// og entries; each entry contains command for state machine, and term when entry was received by lead
 
 	metaStore *MetaStore
 
@@ -25,8 +25,8 @@ type RaftSurfstore struct {
 	id             int64
 	peers          []string
 	pendingCommits []*chan bool
-	commitIndex    int64
-	lastApplied    int64
+	commitIndex    int64				// ndex of highest log entry known to be committed (initialized to 0, increases monotonically)
+	lastApplied    int64				// index of highest log entry applied to state machine (initialized to 0, increases monotonically
 
 	/*--------------- Chaos Monkey --------------*/
 	isCrashed      bool
@@ -165,6 +165,8 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	if totalAppends > len(s.peers)/2 {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- true
 		s.commitIndex = s.commitIndex + 1
+	} else {
+		*s.pendingCommits[len(s.pendingCommits)-1] <- false
 	}
 }
 
@@ -201,30 +203,39 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		defer cancel()
 		
 		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
-			fmt.Println("Success")
+			fmt.Println("Success to append entries for server:", s.id)
 			responses <- true
-			return
+		} else {
+			fmt.Println("Failure to append entries for server:", s.id)
+			responses <- false
 		} 
-		// else {
-		// 	responses <- false
-		// } 
+		return
 	}
 	
 }
 
-// 1. Reply false if term < currentTerm (Â§5.1)
-// 2. Reply false if log doesnâ€™t contain an entry at prevLogIndex whose term
-// matches prevLogTerm (Â§5.3)
-// 3. If an existing entry conflicts with a new one (same index but different
-// terms), delete the existing entry and all that follow it (Â§5.3)
+// 1. Reply false if term < currentTerm (§5.1)
+// 2. Reply false if log doesn’t contain an entry at prevLogIndex
+// whose term matches prevLogTerm (§5.3)
+// 3. If an existing entry conflicts with a new one (same index
+// but different terms), delete the existing entry and all that
+// follow it (§5.3)
 // 4. Append any new entries not already in the log
-// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
-// of last new entry)
+// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	if err := s.CheckPreConditions(false, true); err != nil {
 		return nil, ERR_SERVER_CRASHED
 	}
 
+	// 1. Reply false if term < currentTerm (§5.1)
+	if s.term > input.Term {
+		return &AppendEntryOutput{
+			Success:      false,
+		}, UNKOWN_ERROR
+	}
+
+	// • If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
 	if input.Term > s.term {
 		s.isLeaderMutex.Lock()
 		defer s.isLeaderMutex.Unlock()
@@ -259,11 +270,14 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		if s.commitIndex > int64(input.LeaderCommit) {
 			s.commitIndex = int64(input.LeaderCommit)
 		}
-		for s.lastApplied < s.commitIndex {
-			entry := s.log[s.lastApplied+1]
-			s.metaStore.UpdateFile(ctx, entry.FileMetaData)
-			s.lastApplied++
-		}
+	}
+
+	// • If commitIndex > lastApplied: increment lastApplied, apply
+	// log[lastApplied] to state machine (§5.3)
+	for s.lastApplied < s.commitIndex {
+		entry := s.log[s.lastApplied+1]
+		s.metaStore.UpdateFile(ctx, entry.FileMetaData)
+		s.lastApplied++
 	}
 
 	// for s.lastApplied < input.LeaderCommit {
@@ -274,7 +288,6 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	return &AppendEntryOutput{
 		Success:      true,
-		MatchedIndex: -1,
 	}, nil
 }
 
