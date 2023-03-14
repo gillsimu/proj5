@@ -205,31 +205,27 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 
 		client := NewRaftSurfstoreClient(conn)
 
-		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
-		defer cancel()
+		// ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
+		// defer cancel()
 
-		appendEntryOutput, _ := client.AppendEntries(ctx2, &dummyAppendEntriesInput)
-		// fmt.Println("appendEntryOutput:", err.Error())
-		// if appendEntryOutput == nil {
-		// 	continue
+		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
+
+		// if ctx2.Err() != nil {
+		// 	fmt.Println("AppendEntries Context timed out")
+		// 	responses <- false
+		// 	return
 		// }
-
-		if ctx2.Err() != nil {
-			fmt.Println("Context2 timed out")
-			responses <- false
-			return
-		}
 
 		if appendEntryOutput != nil && appendEntryOutput.Success {
 			fmt.Println("Success to append entries for server address:" , addr)
 			responses <- true
 			return
+		} else {
+			fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
+			responses <- false
+			return
 		}
-		// else {
-		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
-		// 	responses <- false
-		// }
-		// return
+		
 	}
 }
 
@@ -243,16 +239,11 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 
-	for {
-		// if err := s.CheckPreConditions(false, true); err != nil {
-		// 	fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
-		// 	return &AppendEntryOutput{
-		// 		Success: false,
-		// 	}, ERR_SERVER_CRASHED
-		// }
-		if err := s.CheckPreConditions(false, true); err == nil {
-			break;
-		}
+	if err := s.CheckPreConditions(false, true); err != nil {
+		fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
+		return &AppendEntryOutput{
+			Success: false,
+		}, ERR_SERVER_CRASHED
 	}
 
 	// 1. Reply false if term < currentTerm (§5.1)
