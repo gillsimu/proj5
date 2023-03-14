@@ -255,10 +255,10 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// set currentTerm = T, convert to follower (§5.1)
 	if input.Term > s.term {
 		s.isLeaderMutex.Lock()
-		defer s.isLeaderMutex.Unlock()
 		fmt.Println(s.id, "Resetting since s.term", s.term, " < input.Term:", input.Term)
 		s.isLeader = false
 		s.term = input.Term
+		s.isLeaderMutex.Unlock()
 	}
 
 	// TODO actually check entries
