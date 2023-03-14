@@ -268,30 +268,40 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	lastIndexMatchesLogs := int64(-1)
+	someMatchingEntries := false
+	lastMatchedIndexInputEntries := int64(-1)
 	for id, log := range s.log {
-		if id >= len(input.Entries) {
-			break
-		}
-
-		// if log == input.Entries[id] && log.Term == input.Entries[id].Term && log.GetFileMetaData() == input.Entries[id].GetFileMetaData(){
-		if log == input.Entries[id] {
-			s.lastApplied = int64(id)
-			lastIndexMatchesLogs = int64(id)
+		if id < len(input.Entries){
+			if log == input.Entries[id] {
+				someMatchingEntries = true
+				s.lastApplied = int64(id)
+				lastMatchedIndexInputEntries++
+			} else {
+				break
+			}
 		} else {
 			break
 		}
+		
 	}
 
-	s.log = s.log[:lastIndexMatchesLogs+1]
-	if lastIndexMatchesLogs == -1 {
-		s.log = make([]*UpdateOperation, 0)
-	} else if lastIndexMatchesLogs < int64(len(input.Entries)) {
-		s.log = append(s.log, input.Entries[lastIndexMatchesLogs+1:]...)
+	fmt.Println(s.id, "someMatchingEntries", someMatchingEntries, " lastMatchedIndexInputEntries:", lastMatchedIndexInputEntries, " s.lastApplied:", s.lastApplied)
+
+	if !someMatchingEntries {
+		s.log =  input.Entries
 	} else {
-		s.log = append(s.log, make([]*UpdateOperation, 0)...)
+		s.log = append(s.log[:s.lastApplied + 1], input.Entries[lastMatchedIndexInputEntries+1:]...)
 	}
-	fmt.Println(s.id, "lastIndexMatchesLogs", lastIndexMatchesLogs, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
+
+	// s.log = s.log[:lastIndexMatchesLogs+1]
+	// if lastIndexMatchesLogs == -1 {
+	// 	s.log = make([]*UpdateOperation, 0)
+	// } else if lastIndexMatchesLogs < int64(len(input.Entries)) {
+	// 	s.log = append(s.log, input.Entries[lastIndexMatchesLogs+1:]...)
+	// } else {
+	// 	s.log = append(s.log, make([]*UpdateOperation, 0)...)
+	// }
+	fmt.Println(s.id, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
 
 	if s.commitIndex < input.LeaderCommit {
 		if input.LeaderCommit < int64(len(s.log)-1) {
