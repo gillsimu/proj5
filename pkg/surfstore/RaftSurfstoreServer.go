@@ -363,8 +363,8 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		}
 		client := NewRaftSurfstoreClient(conn)
 
-		_, err = client.AppendEntries(ctx, &dummyAppendEntriesInput)
-		if err == nil {
+		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
+		if appendEntryOutput != nil && appendEntryOutput.Success {
 			noOfNodesAlive++
 		}
 	}
