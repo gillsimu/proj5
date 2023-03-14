@@ -3,6 +3,8 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"math"
+
 	// "log"
 
 	// "math"
@@ -16,8 +18,8 @@ import (
 type RaftSurfstore struct {
 	isLeader      bool
 	isLeaderMutex *sync.RWMutex
-	term          int64					// latest term server has seen (initialized to 0) on first boot, increases monotonically
-	log           []*UpdateOperation	// og entries; each entry contains command for state machine, and term when entry was received by lead
+	term          int64              // latest term server has seen (initialized to 0) on first boot, increases monotonically
+	log           []*UpdateOperation // og entries; each entry contains command for state machine, and term when entry was received by lead
 
 	metaStore *MetaStore
 
@@ -25,8 +27,8 @@ type RaftSurfstore struct {
 	id             int64
 	peers          []string
 	pendingCommits []*chan bool
-	commitIndex    int64				// ndex of highest log entry known to be committed (initialized to 0, increases monotonically)
-	lastApplied    int64				// index of highest log entry applied to state machine (initialized to 0, increases monotonically
+	commitIndex    int64 // ndex of highest log entry known to be committed (initialized to 0, increases monotonically)
+	lastApplied    int64 // index of highest log entry applied to state machine (initialized to 0, increases monotonically
 
 	/*--------------- Chaos Monkey --------------*/
 	isCrashed      bool
@@ -34,13 +36,12 @@ type RaftSurfstore struct {
 	UnimplementedRaftSurfstoreServer
 }
 
-
 func (s *RaftSurfstore) CheckPreConditions(checkLeader bool, checkServerHealth bool) error {
 	// check if server is leader or not
 	s.isLeaderMutex.RLock()
 	defer s.isLeaderMutex.RUnlock()
 	isServerLeader := s.isLeader
-	
+
 	if checkLeader && !isServerLeader {
 		return ERR_NOT_LEADER
 	}
@@ -49,7 +50,7 @@ func (s *RaftSurfstore) CheckPreConditions(checkLeader bool, checkServerHealth b
 	s.isCrashedMutex.RLock()
 	defer s.isCrashedMutex.RUnlock()
 	isCrashed := s.isCrashed
-	
+
 	if checkServerHealth && isCrashed {
 		return ERR_SERVER_CRASHED
 	}
@@ -57,22 +58,21 @@ func (s *RaftSurfstore) CheckPreConditions(checkLeader bool, checkServerHealth b
 	return nil
 }
 
-
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
 	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
 
-	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
-	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
-	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.
 	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
 	for {
 		if success, _ := s.SendHeartbeat(ctx, empty); success.Flag {
 			return s.metaStore.GetFileInfoMap(ctx, empty)
 		}
 	}
-	
+
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
@@ -80,9 +80,9 @@ func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashe
 		return nil, err
 	}
 
-	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
-	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
-	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.
 	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
 	for {
 		if success, _ := s.SendHeartbeat(ctx, &emptypb.Empty{}); success.Flag {
@@ -95,9 +95,9 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 	if err := s.CheckPreConditions(true, true); err != nil {
 		return nil, err
 	}
-	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.  
-	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.  
-	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.  
+	// if the leader can query a majority quorum of the nodes, it will reply back to the client with the correct answer.
+	// As long as a majority of the nodes are up and not in a crashed state, the clients should be able to interact with the system successfully.
+	// When a majority of nodes are in a crashed state, clients should block and not receive a response until a majority are restored.
 	// Any clients that interact with a non-leader should get an error message and retry to find the leader.
 	for {
 		if success, _ := s.SendHeartbeat(ctx, empty); success.Flag {
@@ -132,7 +132,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	if commit {
 		fmt.Println("------------------------------------ Updating file in metastore for:", s.id)
 		s.lastApplied = s.commitIndex
-		fmt.Println("Leader new commitIndex:", s.commitIndex," lastApplied:", s.lastApplied, " term:", s.term)
+		fmt.Println("Leader new commitIndex:", s.commitIndex, " lastApplied:", s.lastApplied, " term:", s.term)
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 	// log.Fatalf("UNKOWN_ERROR")
@@ -142,7 +142,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// send entry to all my followers and count the replies
 	responses := make(chan bool, len(s.peers)-1)
-	
+
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
@@ -178,14 +178,13 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, responses chan bool) {
 	dummyAppendEntriesInput := AppendEntryInput{
-		Term: s.term,
+		Term:         s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
 		PrevLogIndex: s.commitIndex,
 		Entries:      s.log, //TODO check this
 		LeaderCommit: s.commitIndex,
 	}
 
-	
 	for {
 		// TODO check all errors
 		if err := s.CheckPreConditions(false, true); err != nil {
@@ -199,7 +198,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		if err != nil {
 			fmt.Println("Dialing failed:", err)
 			responses <- false
-			return;
+			return
 			// continue
 		}
 
@@ -208,21 +207,21 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput) 
+		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
 		// fmt.Println("appendEntryOutput:", err.Error())
 		// if appendEntryOutput == nil {
 		// 	continue
 		// }
 
-		if appendEntryOutput!=nil && appendEntryOutput.Success {
+		if appendEntryOutput != nil && appendEntryOutput.Success {
 			fmt.Println("Success to append entries for server:", s.id)
 			responses <- true
 			return
-		} 
+		}
 		// else {
 		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
 		// 	responses <- false
-		// } 
+		// }
 		// return
 	}
 }
@@ -239,7 +238,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	if err := s.CheckPreConditions(false, true); err != nil {
 		// fmt.Println(s.id, "Pre condition check failed: ", err)
 		return &AppendEntryOutput{
-			Success:      false,
+			Success: false,
 		}, ERR_SERVER_CRASHED
 	}
 
@@ -247,7 +246,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	if s.term > input.Term {
 		fmt.Println(s.id, "ERROR: s.term", s.term, " > input.Term:", input.Term)
 		return &AppendEntryOutput{
-			Success:      false,
+			Success: false,
 		}, UNKOWN_ERROR
 	}
 
@@ -262,9 +261,9 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	lastIndexMatchesLogs := int64(len(s.log) -1)
-	for id, log := range s.log{
-		if id >= len(input.Entries){
+	lastIndexMatchesLogs := int64(len(s.log) - 1)
+	for id, log := range s.log {
+		if id >= len(input.Entries) {
 			break
 		}
 
@@ -275,19 +274,20 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 			break
 		}
 	}
-	
-	s.log = s.log[:lastIndexMatchesLogs + 1]
-	if lastIndexMatchesLogs < int64(len(input.Entries)) { 
-		s.log = append(s.log, input.Entries[lastIndexMatchesLogs + 1:]...)
+
+	s.log = s.log[:lastIndexMatchesLogs+1]
+	if lastIndexMatchesLogs < int64(len(input.Entries)) {
+		s.log = append(s.log, input.Entries[lastIndexMatchesLogs+1:]...)
 	} else {
 		s.log = append(s.log, make([]*UpdateOperation, 0)...)
 	}
-	fmt.Println(s.id, "lastIndexMatchesLogs", lastIndexMatchesLogs, "s.commitIndex:",s.commitIndex, "input.LeaderCommit:",input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
+	fmt.Println(s.id, "lastIndexMatchesLogs", lastIndexMatchesLogs, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
 
-	if s.commitIndex < input.LeaderCommit  {
-		s.commitIndex = int64(len(s.log)-1)
-		if s.commitIndex > int64(input.LeaderCommit) {
-			s.commitIndex = int64(input.LeaderCommit)
+	if s.commitIndex < input.LeaderCommit {
+		if input.LeaderCommit < int64(len(s.log)-1) {
+			s.commitIndex = input.LeaderCommit
+		} else {
+			s.commitIndex = int64(len(s.log)-1)
 		}
 	}
 
@@ -304,10 +304,10 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// 	s.metaStore.UpdateFile(ctx, entry.FileMetaData)
 	// 	s.lastApplied++
 	// }
-	fmt.Println(s.id, "SUCCESS")
+	fmt.Println(s.id, "Append entry to server successfull:", s.id)
 
 	return &AppendEntryOutput{
-		Success:      true,
+		Success: true,
 	}, nil
 }
 
@@ -334,13 +334,13 @@ func (s *RaftSurfstore) GetPreviousLogTerm(commitIndex int64) int64 {
 
 func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
 	fmt.Println("------------------------------------ Sending heartbeat from leader:", s.id)
-	
+
 	if err := s.CheckPreConditions(true, true); err != nil {
 		return &Success{Flag: false}, err
 	}
 	fmt.Println("leader: id:", s.id, " commitIndex:", s.commitIndex, "last applied:", s.lastApplied, "term:", s.term)
 	dummyAppendEntriesInput := AppendEntryInput{
-		Term: s.term,
+		Term:         s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
 		PrevLogIndex: s.commitIndex,
 		Entries:      s.log,
@@ -348,7 +348,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	}
 
 	noOfNodesAlive := 1
-	countOfMajorityNodes := len(s.peers)/2
+	countOfMajorityNodes := len(s.peers) / 2
 
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
@@ -365,7 +365,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 
 		_, err = client.AppendEntries(ctx, &dummyAppendEntriesInput)
 		if err == nil {
-			noOfNodesAlive++;
+			noOfNodesAlive++
 		}
 	}
 
