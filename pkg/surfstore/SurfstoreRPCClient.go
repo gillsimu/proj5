@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -144,7 +145,12 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 			fmt.Println("Update File Context timed out")
 			log.Fatalf("Update File Context timed out Error while getting UpdateFile")
 			conn.Close()
-			return ctx.Err()
+			return err
+		} 
+		if err != nil && strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
+			fmt.Println("Update File issued on server that is not leader", err)
+			conn.Close()
+			return err
 		}
 		if err != nil {
 			fmt.Println("Error while updating file", err)
