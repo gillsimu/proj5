@@ -208,8 +208,8 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput) 
-		fmt.Println("appendEntryOutput:", err.Error())
+		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput) 
+		// fmt.Println("appendEntryOutput:", err.Error())
 		// if appendEntryOutput == nil {
 		// 	continue
 		// }
@@ -225,8 +225,6 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		// } 
 		// return
 	}
-	responses <- false
-	return
 }
 
 // 1. Reply false if term < currentTerm (§5.1)
@@ -239,7 +237,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	if err := s.CheckPreConditions(false, true); err != nil {
-		fmt.Println(s.id, "Pre condition check failed: ", err)
+		// fmt.Println(s.id, "Pre condition check failed: ", err)
 		return &AppendEntryOutput{
 			Success:      false,
 		}, ERR_SERVER_CRASHED
