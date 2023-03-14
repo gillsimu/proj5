@@ -203,11 +203,11 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		if appendEntryOutput, err := client.AppendEntries(ctx, &dummyAppendEntriesInput); err == nil && appendEntryOutput.Success {
 			fmt.Println("Success")
 			responses <- true
+			return
 		} 
-		else {
-			responses <- false
-		} 
-		return
+		// else {
+		// 	responses <- false
+		// } 
 	}
 	
 }
