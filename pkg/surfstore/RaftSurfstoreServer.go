@@ -268,7 +268,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	// TODO actually check entries
-	lastIndexMatchesLogs := int64(0)
+	lastIndexMatchesLogs := int64(-1)
 	for id, log := range s.log {
 		if id >= len(input.Entries) {
 			break
@@ -284,7 +284,9 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	}
 
 	s.log = s.log[:lastIndexMatchesLogs+1]
-	if lastIndexMatchesLogs < int64(len(input.Entries)) {
+	if lastIndexMatchesLogs == -1 {
+		s.log = make([]*UpdateOperation, 0)
+	} else if lastIndexMatchesLogs < int64(len(input.Entries)) {
 		s.log = append(s.log, input.Entries[lastIndexMatchesLogs+1:]...)
 	} else {
 		s.log = append(s.log, make([]*UpdateOperation, 0)...)
