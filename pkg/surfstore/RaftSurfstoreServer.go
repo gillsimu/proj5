@@ -157,7 +157,7 @@ func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
 		if err != nil {
 			fmt.Println("For updating file, the heartbeat returned err since servers crashed:", err.Error())
-			time.Sleep(100*time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		return success.Flag
@@ -327,7 +327,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		s.log = append(s.log[:s.lastApplied+1], input.Entries[lastMatchedIndexInputEntries+1:]...)
 	}
 	fmt.Println(s.id, " len(s.log):", len(s.log), " len(input.Entries):", len(input.Entries))
-
+	fmt.Println("s.log:", s.log, " input.Entries:", input.Entries)
 	// s.log = s.log[:lastIndexMatchesLogs+1]
 	// if lastIndexMatchesLogs == -1 {
 	// 	s.log = make([]*UpdateOperation, 0)
