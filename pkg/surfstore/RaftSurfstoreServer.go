@@ -147,6 +147,11 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 	for {
+		if err := s.CheckPreConditions(true, true); err != nil {
+			fmt.Println("server requested on:", s.id, " is:", err)
+			return false
+		}
+	
 		fmt.Println("For updating file, SendHeartbeat for leader", s.id)
 		success, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
@@ -393,6 +398,9 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		return &Success{Flag: false}, err
 	}
 
+	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
+
+
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term:         s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
@@ -401,7 +409,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		LeaderCommit: s.commitIndex,
 	}
 
-	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
 
 	noOfNodesAlive := 1
 	countOfMajorityNodes := len(s.peers) / 2
@@ -471,7 +478,7 @@ func (s *RaftSurfstore) GetInternalState(ctx context.Context, empty *emptypb.Emp
 		MetaMap:  fileInfoMap,
 	}
 	s.isLeaderMutex.RUnlock()
-	fmt.Println("^^^^^^^^^^^^^^^^^state:", state)
+	fmt.Println("^^^^^^ for server:", s.id, " state:", state)
 	return state, nil
 }
 
