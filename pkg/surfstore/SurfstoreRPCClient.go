@@ -2,10 +2,8 @@ package surfstore
 
 import (
 	context "context"
-	"errors"
 	"fmt"
 	"log"
-	// "strings"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -139,18 +137,9 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		// perform the call
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-
 		b, err := client.UpdateFile(ctx, fileMetaData)
 		if ctx.Err() != nil {
 			fmt.Println("Update File Context timed out")
-			// log.Fatalf("Update File Context timed out Error while getting UpdateFile")
-			conn.Close()
-			return ctx.Err()
-		} 
-		if err != nil && err.Error() == ERR_NOT_LEADER.Error() {
-			fmt.Println("Update File issued on server that is not leader", err)
-			conn.Close()
-			return err
 		}
 		if err != nil {
 			fmt.Println("Error while updating file", err)
@@ -168,7 +157,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		return conn.Close()
 	}
 	log.Fatalf("Error while getting UpdateFile:")
-	return errors.New("CLuster issue Error while getting UpdateFile")
+	return UNKOWN_ERROR
 }
 
 
