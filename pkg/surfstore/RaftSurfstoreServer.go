@@ -3,6 +3,7 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"time"
 
 	// "math"
 
@@ -156,6 +157,7 @@ func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
 		if err != nil {
 			fmt.Println("For updating file, the heartbeat returned err since servers crashed:", err.Error())
+			time.Sleep(100*time.Millisecond)
 			continue
 		}
 		return success.Flag
