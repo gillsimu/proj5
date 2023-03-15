@@ -3,7 +3,6 @@ package surfstore
 import (
 	context "context"
 	"fmt"
-	"time"
 
 	// "math"
 
@@ -11,7 +10,7 @@ import (
 
 	// "math"
 	"sync"
-	// "time"
+	"time"
 
 	"google.golang.org/grpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -226,6 +225,11 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 			responses <- false
 			return
 		}
+		// else {
+		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
+		// 	responses <- false
+		// 	return
+		// }
 
 	}
 }
