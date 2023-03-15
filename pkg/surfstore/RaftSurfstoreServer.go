@@ -1,4 +1,3 @@
-
 package surfstore
 
 import (
@@ -120,7 +119,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		Term:         s.term,
 		FileMetaData: filemeta,
 	})
-	
+
 	// commitChan := make(chan bool)
 	// s.pendingCommits = append(s.pendingCommits, &commitChan)
 
@@ -151,7 +150,7 @@ func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 			fmt.Println("server requested on:", s.id, " is:", err)
 			return false
 		}
-	
+
 		fmt.Println("For updating file, SendHeartbeat for leader", s.id)
 		success, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
@@ -398,9 +397,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		return &Success{Flag: false}, err
 	}
 
-	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
-
-
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term:         s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
@@ -409,6 +405,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		LeaderCommit: s.commitIndex,
 	}
 
+	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
 
 	noOfNodesAlive := 1
 	countOfMajorityNodes := len(s.peers) / 2
