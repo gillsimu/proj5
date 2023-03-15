@@ -169,9 +169,10 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	}
 
 	fmt.Println("totalAppends:", totalAppends, " totalResponses:", totalResponses)
-	s.commitIndex = s.commitIndex + 1
+	
 	if totalAppends > len(s.peers)/2 {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- true
+		s.commitIndex = s.commitIndex + 1
 	} else {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- false
 	}
@@ -367,9 +368,14 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	fmt.Println("------------------------------------ Sending heartbeat from leader:", s.id)
 
 	if err := s.CheckPreConditions(true, true); err != nil {
+		if err.Error() == ERR_NOT_LEADER.Error() {
+			fmt.Println("id:", s.id, " is not a leader")
+		} else {
+			fmt.Println("Leader id:", s.id, " is crashed")
+		}
 		return &Success{Flag: false}, err
 	}
-	fmt.Println("leader: id:", s.id, " commitIndex:", s.commitIndex, "last applied:", s.lastApplied, "term:", s.term)
+	
 	dummyAppendEntriesInput := AppendEntryInput{
 		Term:         s.term,
 		PrevLogTerm:  s.GetPreviousLogTerm(s.commitIndex),
@@ -377,6 +383,8 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		Entries:      s.log,
 		LeaderCommit: s.commitIndex,
 	}
+	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term," PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm," PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex)
+	fmt.Println("leader id:", s.id, " Server Entires: ", dummyAppendEntriesInput.Entries)
 
 	noOfNodesAlive := 1
 	countOfMajorityNodes := len(s.peers) / 2
@@ -386,6 +394,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		if int64(idx) == s.id {
 			continue
 		}
+		fmt.Println("sending heartbeat from leader:", s.id, " to server:", idx)
 
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
