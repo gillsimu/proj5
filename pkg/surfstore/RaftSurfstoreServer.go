@@ -108,7 +108,7 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	// fmt.Println("------------------------------------ Request received to update file:")
+	fmt.Println("------------------------------------ Request received to update file:")
 	if err := s.CheckPreConditions(true, true); err != nil {
 		fmt.Println("server requested on:", s.id, " is:", err)
 		return nil, err
@@ -125,10 +125,10 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	// send entry to all followers in parallel
 	go s.sendToAllFollowersInParallel(ctx)
 
-	// fmt.Println("------------------------------------ Hello:")
+	fmt.Println("------------------------------------ sent ToAllFollowersInParallel:")
 	// commit the entry once majority of followers have it in their log
 	commit := <-commitChan
-	// fmt.Println("------------------------------------ commit:", commit)
+	fmt.Println("------------------------------------ commit:", commit)
 	// once committed, apply to the state machine
 	if commit {
 		fmt.Println("------------------------------------ Updating file in metastore for:", s.id)
@@ -149,7 +149,7 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 		if int64(idx) == s.id {
 			continue
 		}
-		// fmt.Println("Leader:", s.id, " server request sent to:", idx)
+		fmt.Println("Leader:", s.id, " server request sent to:", idx)
 		go s.sendToFollower(ctx, addr, responses)
 	}
 
@@ -168,7 +168,7 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 		}
 	}
 
-	// fmt.Println("totalAppends:", totalAppends, " totalResponses:", totalResponses)
+	fmt.Println("totalAppends:", totalAppends, " totalResponses:", totalResponses)
 	if totalAppends > len(s.peers)/2 {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- true
 		s.commitIndex = s.commitIndex + 1
@@ -217,11 +217,11 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		// }
 
 		if appendEntryOutput != nil && appendEntryOutput.Success {
-			// fmt.Println("Success to append entries for server address:" , addr)
+			fmt.Println("Success to append entries for server address:" , addr)
 			responses <- true
 			return
 		} else if appendEntryOutput != nil && err != nil && err.Error() == UNKOWN_ERROR.Error(){
-			// fmt.Println("Server rejected the append entry, ", s.id, " err:", err)
+			fmt.Println("Server rejected the append entry, ", s.id, " err:", err)
 			responses <- false
 			return
 		}
@@ -239,7 +239,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 
 	if err := s.CheckPreConditions(false, true); err != nil {
-		// fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
+		fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
 		return &AppendEntryOutput{
 			Success: false,
 		}, ERR_SERVER_CRASHED
@@ -247,7 +247,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// 1. Reply false if term < currentTerm (§5.1)
 	if s.term > input.Term {
-		// fmt.Println(s.id, "ERROR: s.term", s.term, " > input.Term:", input.Term)
+		fmt.Println(s.id, "ERROR: s.term", s.term, " > input.Term:", input.Term)
 		return &AppendEntryOutput{
 			Success: false,
 		}, UNKOWN_ERROR
@@ -316,7 +316,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 			s.commitIndex = int64(len(s.log)-1)
 		}
 	}
-	// fmt.Println(s.id, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
+	fmt.Println(s.id, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
 
 	// • If commitIndex > lastApplied: increment lastApplied, apply
 	// log[lastApplied] to state machine (§5.3)
