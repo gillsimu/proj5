@@ -125,10 +125,12 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	// send entry to all followers in parallel
 	go s.sendToAllFollowersInParallel(ctx)
 
+	// TODO keep trying and rely on send heartbeat
+
 	fmt.Println("------------------------------------ Hello:")
 	// commit the entry once majority of followers have it in their log
 	commit := <-commitChan
-	fmt.Println("------------------------------------ commit:", commit)
+	fmt.Println("----------------------e-------------- commit:", commit)
 	// once committed, apply to the state machine
 	if commit {
 		fmt.Println("------------------------------------ Updating file in metastore for:", s.id)
