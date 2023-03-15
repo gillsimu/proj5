@@ -119,7 +119,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		Term:         s.term,
 		FileMetaData: filemeta,
 	})
-	s.commitIndex++
+	
 	// commitChan := make(chan bool)
 	// s.pendingCommits = append(s.pendingCommits, &commitChan)
 
@@ -134,6 +134,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 	// once committed, apply to the state machine
 	if commit {
+		s.commitIndex++
 		fmt.Println("-----Applying to state machine & Updating file in metastore for leader:", s.id)
 		s.lastApplied = s.commitIndex
 		fmt.Println("Leader new commitIndex:", s.commitIndex, " lastApplied:", s.lastApplied, " term:", s.term)
