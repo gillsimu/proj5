@@ -241,9 +241,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	if err := s.CheckPreConditions(false, true); err != nil {
 		fmt.Println(s.id, "Pre condition check failed, this server is crashed ")
-		return &AppendEntryOutput{
-			Success: false,
-		}, ERR_SERVER_CRASHED
+		return nil, ERR_SERVER_CRASHED
 	}
 
 	// 1. Reply false if term < currentTerm (§5.1)
@@ -252,6 +250,16 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		return &AppendEntryOutput{
 			Success: false,
 		}, UNKOWN_ERROR
+	}
+
+	// 2. Reply false if log doesn’t contain an entry at prevLogIndex
+	// whose term matches prevLogTerm (§5.3)
+	if input.PrevLogIndex != -1 {
+		if input.PrevLogIndex >= int64(len(s.log)) || s.log[input.PrevLogIndex].Term != input.PrevLogTerm {
+			return &AppendEntryOutput{
+				Success: false,
+			}, UNKOWN_ERROR
+		}
 	}
 
 	// • If RPC request or response contains term T > currentTerm:
