@@ -297,6 +297,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// Actually checking the entries and overriding the ones that need to be
 	someMatchingEntries := false
+	s.lastApplied = int64(-1)
 	lastMatchedIndexInputEntries := int64(-1)
 	for id, log := range s.log {
 		if id < len(input.Entries) {
