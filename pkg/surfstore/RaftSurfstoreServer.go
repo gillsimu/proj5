@@ -204,16 +204,16 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 
 		client := NewRaftSurfstoreClient(conn)
 
-		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
-		defer cancel()
+		// ctx2, cancel := context.WithTimeout(context.Background(), time.Second/50)
+		// defer cancel()
 
 		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
 
-		if ctx2.Err() != nil {
-			fmt.Println("AppendEntries Context timed out")
-			responses <- false
-			return
-		}
+		// if ctx2.Err() != nil {
+		// 	fmt.Println("AppendEntries Context timed out")
+		// 	responses <- false
+		// 	return
+		// }
 
 		if appendEntryOutput != nil && appendEntryOutput.Success {
 			fmt.Println("Success to append entries for server address:" , addr)
