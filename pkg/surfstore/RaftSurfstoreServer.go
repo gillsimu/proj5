@@ -219,12 +219,11 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 			fmt.Println("Success to append entries for server address:" , addr)
 			responses <- true
 			return
-		} 
-		// else {
-		// 	fmt.Println("Failure to append entries for server, ", s.id, " err:", err)
-		// 	responses <- false
-		// 	return
-		// }
+		} else if appendEntryOutput != nil && !appendEntryOutput.Success {
+			fmt.Println("Prev log or term didnt match ", s.id, " err:", err)
+			responses <- false
+			return
+		}
 		
 	}
 }
