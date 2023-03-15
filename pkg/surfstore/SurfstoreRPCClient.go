@@ -3,7 +3,7 @@ package surfstore
 import (
 	context "context"
 	"fmt"
-	"log"
+	// "log"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -102,23 +102,25 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 		// connect to the server
 		conn, err := grpc.Dial(metaStoreAddr, grpc.WithInsecure())
 		if err != nil {
-			continue
+			fmt.Println("-----Error while dialing to server-----")
+			return err
 		}
 		c := NewRaftSurfstoreClient(conn)
 
 		// perform the call
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		b, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
+
+		fileInfoMap, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
 		if err != nil {
 			continue
 		}
-		*serverFileInfoMap = b.FileInfoMap
+		*serverFileInfoMap = fileInfoMap.FileInfoMap
 
 		// close the connection
 		return conn.Close()
 	}
-	log.Fatalf("Error while getting fileInfoMap:")
+	// log.Fatalf("Error while getting fileInfoMap:")
 	return UNKOWN_ERROR
 }
 
@@ -138,9 +140,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		b, err := client.UpdateFile(ctx, fileMetaData)
-		if ctx.Err() != nil {
-			fmt.Println("Update File Context timed out")
-		}
+
 		if err != nil {
 			fmt.Println("Error while updating file", err)
 			// if(KnownError(err)){
@@ -156,7 +156,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		// close the connection
 		return conn.Close()
 	}
-	log.Fatalf("Error while getting UpdateFile:")
+	// log.Fatalf("Error while getting UpdateFile:")
 	return UNKOWN_ERROR
 }
 
@@ -223,7 +223,7 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 		// close the connection
 		return conn.Close()
 	}
-	log.Fatalf("Error while getting GetBlockStoreMap:")
+	// log.Fatalf("Error while getting GetBlockStoreMap:")
 	return UNKOWN_ERROR
 }
 
@@ -250,7 +250,7 @@ func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error
 		// close the connection
 		return conn.Close()
 	}
-	log.Fatalf("Error while getting GetBlockStoreAddrs:")
+	// log.Fatalf("Error while getting GetBlockStoreAddrs:")
 	return UNKOWN_ERROR
 }
 
