@@ -206,7 +206,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 
 		client := NewRaftSurfstoreClient(conn)
 
-		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/30)
+		ctx2, cancel := context.WithTimeout(context.Background(), time.Second/40)
 		defer cancel()
 
 		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
@@ -218,7 +218,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 		}
 
 		if appendEntryOutput != nil && appendEntryOutput.Success {
-			fmt.Println("Success to append entries for server address:" , addr)
+			fmt.Println("Success to append entries for server address:", addr)
 			responses <- true
 			return
 		} else if appendEntryOutput != nil && !appendEntryOutput.Success {
@@ -226,7 +226,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 			responses <- false
 			return
 		}
-		
+
 	}
 }
 
@@ -277,7 +277,7 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	someMatchingEntries := false
 	lastMatchedIndexInputEntries := int64(-1)
 	for id, log := range s.log {
-		if id < len(input.Entries){
+		if id < len(input.Entries) {
 			if log == input.Entries[id] {
 				someMatchingEntries = true
 				s.lastApplied = int64(id)
@@ -288,15 +288,15 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		} else {
 			break
 		}
-		
+
 	}
 
-	fmt.Println(s.id, " len(s.log):", len(s.log), " len(input.Entries):", len(input.Entries)," someMatchingEntries", someMatchingEntries, " lastMatchedIndexInputEntries:", lastMatchedIndexInputEntries, " s.lastApplied:", s.lastApplied)
+	fmt.Println(s.id, " len(s.log):", len(s.log), " len(input.Entries):", len(input.Entries), " someMatchingEntries", someMatchingEntries, " lastMatchedIndexInputEntries:", lastMatchedIndexInputEntries, " s.lastApplied:", s.lastApplied)
 
 	if !someMatchingEntries {
-		s.log =  input.Entries
+		s.log = input.Entries
 	} else {
-		s.log = append(s.log[:s.lastApplied + 1], input.Entries[lastMatchedIndexInputEntries+1:]...)
+		s.log = append(s.log[:s.lastApplied+1], input.Entries[lastMatchedIndexInputEntries+1:]...)
 	}
 	fmt.Println(s.id, " len(s.log):", len(s.log), " len(input.Entries):", len(input.Entries))
 
@@ -308,12 +308,12 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// } else {
 	// 	s.log = append(s.log, make([]*UpdateOperation, 0)...)
 	// }
-	
+
 	if s.commitIndex < input.LeaderCommit {
 		if input.LeaderCommit < int64(len(s.log)-1) {
 			s.commitIndex = input.LeaderCommit
 		} else {
-			s.commitIndex = int64(len(s.log)-1)
+			s.commitIndex = int64(len(s.log) - 1)
 		}
 	}
 	fmt.Println(s.id, "s.commitIndex:", s.commitIndex, "input.LeaderCommit:", input.LeaderCommit, " s.term", s.term, " Leader.Term:", input.Term)
