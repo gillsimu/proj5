@@ -169,9 +169,9 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	}
 
 	fmt.Println("totalAppends:", totalAppends, " totalResponses:", totalResponses)
+	s.commitIndex = s.commitIndex + 1
 	if totalAppends > len(s.peers)/2 {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- true
-		s.commitIndex = s.commitIndex + 1
 	} else {
 		*s.pendingCommits[len(s.pendingCommits)-1] <- false
 	}
