@@ -1,3 +1,4 @@
+
 package surfstore
 
 import (
@@ -146,6 +147,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 	for {
+		fmt.Println("For updating file, SendHeartbeat for leader", s.id)
 		success, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
 		if err != nil {
@@ -402,8 +404,8 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
 
 	noOfNodesAlive := 1
-	noOfNodesRejectedCommit := 0
 	countOfMajorityNodes := len(s.peers) / 2
+	noOfNodesRejected := 0
 	serverCrashed := false
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
@@ -420,17 +422,16 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		client := NewRaftSurfstoreClient(conn)
 
 		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
-		fmt.Println("Output of AppendEntries for server:", idx, " is:", appendEntryOutput)
 		if appendEntryOutput == nil {
 			serverCrashed = true
 		} else if appendEntryOutput.Success {
 			noOfNodesAlive++
-		} else {
-			noOfNodesRejectedCommit++
+		} else if !appendEntryOutput.Success {
+			noOfNodesRejected++
 		}
 	}
 
-	fmt.Println(s.id, "Nodes alive: ", noOfNodesAlive, " countOfMajorityNodes:", countOfMajorityNodes+1, " noOfNodesRejectedCommit:", noOfNodesRejectedCommit)
+	fmt.Println(s.id, "Nodes alive: ", noOfNodesAlive, " countOfMajorityNodes:", countOfMajorityNodes+1, " noOfNodesRejected:", noOfNodesRejected)
 	if noOfNodesAlive > countOfMajorityNodes {
 		return &Success{Flag: true}, nil
 	}
