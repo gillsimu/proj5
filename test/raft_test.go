@@ -97,6 +97,7 @@ func TestRaftNewLeaderPushesUpdates(t *testing.T) {
 	}
 
 	test.Clients[leaderIdx].UpdateFile(test.Context, filemeta)
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
 

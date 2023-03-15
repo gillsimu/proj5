@@ -373,7 +373,7 @@ func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Succe
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
 	s.term++
-
+	fmt.Println("Set Leader for server:", s.id)
 	// TODO update state as per paper
 	return &Success{Flag: true}, nil
 }
@@ -453,7 +453,7 @@ func (s *RaftSurfstore) Crash(ctx context.Context, _ *emptypb.Empty) (*Success, 
 	s.isCrashedMutex.Lock()
 	s.isCrashed = true
 	s.isCrashedMutex.Unlock()
-
+	fmt.Println("Crashing server:", s.id)
 	return &Success{Flag: true}, nil
 }
 
@@ -461,7 +461,7 @@ func (s *RaftSurfstore) Restore(ctx context.Context, _ *emptypb.Empty) (*Success
 	s.isCrashedMutex.Lock()
 	s.isCrashed = false
 	s.isCrashedMutex.Unlock()
-
+	fmt.Println("Restoring server:", s.id)
 	return &Success{Flag: true}, nil
 }
 
