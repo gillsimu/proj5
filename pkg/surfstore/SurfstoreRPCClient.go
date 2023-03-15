@@ -142,13 +142,13 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 
 		b, err := client.UpdateFile(ctx, fileMetaData)
 		if ctx.Err() != nil {
-			fmt.Println("Update File Context timed out")
+			// fmt.Println("Update File Context timed out")
 			log.Fatalf("Update File Context timed out Error while getting UpdateFile")
 			conn.Close()
-			return err
+			return ctx.Err()
 		} 
-		if err != nil && strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
-			fmt.Println("Update File issued on server that is not leader", err)
+		if err != nil && err.Error() == ERR_NOT_LEADER.Error() {
+			// fmt.Println("Update File issued on server that is not leader", err)
 			conn.Close()
 			return err
 		}
