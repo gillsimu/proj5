@@ -136,7 +136,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	if commit {
 		s.commitIndex++
 		fmt.Println("-----Applying to state machine & Updating file in metastore for leader:", s.id)
-		s.lastApplied++
+		s.lastApplied = s.commitIndex
 		fmt.Println("Leader new commitIndex:", s.commitIndex, " lastApplied:", s.lastApplied, " term:", s.term)
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
@@ -146,7 +146,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 	for {
-		fmt.Println("For updating file, sendingheartbeats:")
 		success, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
 		if err != nil {
@@ -297,7 +296,6 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// Actually checking the entries and overriding the ones that need to be
 	someMatchingEntries := false
-	s.lastApplied = int64(-1)
 	lastMatchedIndexInputEntries := int64(-1)
 	for id, log := range s.log {
 		if id < len(input.Entries) {
@@ -404,6 +402,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	fmt.Println("leader id:", s.id, " commitIndex:", s.commitIndex, " last applied:", s.lastApplied, " term:", s.term, " PrevLogTerm:", dummyAppendEntriesInput.PrevLogTerm, " PrevLogIndex:", dummyAppendEntriesInput.PrevLogIndex, " Server Entires: ", dummyAppendEntriesInput.Entries)
 
 	noOfNodesAlive := 1
+	noOfNodesRejectedCommit := 0
 	countOfMajorityNodes := len(s.peers) / 2
 	serverCrashed := false
 	// contact all the follower, send some AppendEntries call
@@ -421,14 +420,17 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		client := NewRaftSurfstoreClient(conn)
 
 		appendEntryOutput, _ := client.AppendEntries(ctx, &dummyAppendEntriesInput)
+		fmt.Println("Output of AppendEntries for server:", idx, " is:", appendEntryOutput)
 		if appendEntryOutput == nil {
 			serverCrashed = true
 		} else if appendEntryOutput.Success {
 			noOfNodesAlive++
+		} else {
+			noOfNodesRejectedCommit++
 		}
 	}
 
-	fmt.Println(s.id, "Nodes alive: ", noOfNodesAlive, " countOfMajorityNodes:", countOfMajorityNodes+1)
+	fmt.Println(s.id, "Nodes alive: ", noOfNodesAlive, " countOfMajorityNodes:", countOfMajorityNodes+1, " noOfNodesRejectedCommit:", noOfNodesRejectedCommit)
 	if noOfNodesAlive > countOfMajorityNodes {
 		return &Success{Flag: true}, nil
 	}
