@@ -119,6 +119,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		Term:         s.term,
 		FileMetaData: filemeta,
 	})
+	s.commitIndex++
 	// commitChan := make(chan bool)
 	// s.pendingCommits = append(s.pendingCommits, &commitChan)
 
