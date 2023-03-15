@@ -136,7 +136,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	if commit {
 		s.commitIndex++
 		fmt.Println("-----Applying to state machine & Updating file in metastore for leader:", s.id)
-		s.lastApplied = s.commitIndex
+		s.lastApplied++
 		fmt.Println("Leader new commitIndex:", s.commitIndex, " lastApplied:", s.lastApplied, " term:", s.term)
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
@@ -146,6 +146,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 func (s *RaftSurfstore) sendToAllFollowers(ctx context.Context) bool {
 	for {
+		fmt.Println("For updating file, sendingheartbeats:")
 		success, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		fmt.Println("For updating file, the heartbeat returned success:", success.Flag)
 		if err != nil {
